@@ -48,7 +48,7 @@ BODY_TYPES_FEMALE = (
 class User(models.Model):
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=128)   # store hashed password
-    screen_name = models.CharField(max_length=150, unique=True)
+    screen_name = models.CharField(max_length=150)
     role = models.CharField(choices=ROLES, max_length=20, default='user')
     card_details = models.CharField(max_length=255, blank=True, null=True)
     is_admin = models.BooleanField(default=False)
@@ -58,13 +58,12 @@ class User(models.Model):
     def __str__(self):
         return f"{self.email} - {self.role}"
 
-
 class ContributorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='contributor_profile')
     legal_full_name = models.CharField(max_length=255)
     show_name_public = models.BooleanField(default=False)
     date_of_birth = models.DateField()
-    phone_number = models.CharField(max_length=20, unique=True)
+    phone_number = models.CharField(max_length=20)
     country = models.CharField(max_length=100)
     state = models.CharField(max_length=100, blank=True, null=True)
     nationality = models.CharField(max_length=100, blank=True, null=True)
