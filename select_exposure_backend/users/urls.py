@@ -1,18 +1,20 @@
-from django.urls import path
+from rest_framework.routers import DefaultRouter
+from django.urls import path, include
 from .views import (
-    RegisterView,
-    ContributorRegisterView,
-    LoginView,
-    ToggleAdminStatusView,
-    PasswordResetRequestView,
-    PasswordResetView,
+    UserViewSet,
+    ContributorViewSet,
+    InviteViewSet,
+    ContestPerformanceViewSet,
+    BadgeViewSet,
 )
 
+router = DefaultRouter()
+router.register(r'users', UserViewSet, basename='users')  # includes register, login, password-reset, toggle-admin
+router.register(r'contributors', ContributorViewSet, basename='contributors')  # contributor register
+router.register(r'invites', InviteViewSet, basename='invites')
+router.register(r'contest-performance', ContestPerformanceViewSet, basename='contest-performance')
+router.register(r'badges', BadgeViewSet, basename='badges')
+
 urlpatterns = [
-    path('register/', RegisterView.as_view(), name='register'),
-    path('register-contributor/', ContributorRegisterView.as_view(), name='register-contributor'),
-    path('login/', LoginView.as_view(), name='login'),
-    path('toggle-admin/', ToggleAdminStatusView.as_view(), name='toggle-admin'),
-    path('password-reset-request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
-    path('password-reset/', PasswordResetView.as_view(), name='password_reset'),
+    path('', include(router.urls)),
 ]

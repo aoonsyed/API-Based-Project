@@ -1,6 +1,15 @@
 from rest_framework import serializers
-from .models import User, ContributorProfile
 from django.contrib.auth.hashers import make_password
+
+from .models import (
+    User,
+    ContributorProfile,
+    Contest,
+    ContestPerformance,
+    Badge,
+    Invite,
+)
+
 
 class UserRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -9,7 +18,12 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'email', 'screen_name', 'role', 'password', 'confirm_password', 'card_details'
+            'email',
+            'screen_name',
+            'role',
+            'password',
+            'confirm_password',
+            'card_details',
         ]
 
     def validate(self, attrs):
@@ -25,10 +39,12 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         validated_data['password'] = make_password(raw_password)
         return User.objects.create(**validated_data)
 
+
 class ContributorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContributorProfile
         exclude = ['user']
+
 
 class ContributorRegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -38,7 +54,13 @@ class ContributorRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'email', 'screen_name', 'role', 'password', 'confirm_password', 'card_details', 'contributor_profile'
+            'email',
+            'screen_name',
+            'role',
+            'password',
+            'confirm_password',
+            'card_details',
+            'contributor_profile',
         ]
 
     def validate(self, attrs):
@@ -53,22 +75,59 @@ class ContributorRegisterSerializer(serializers.ModelSerializer):
         validated_data.pop('confirm_password')
         raw_password = validated_data.pop('password')
         validated_data['password'] = make_password(raw_password)
+
         user = User.objects.create(**validated_data)
         ContributorProfile.objects.create(user=user, **contributor_data)
         return user
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField()
 
+
 class ToggleAdminSerializer(serializers.Serializer):
     email = serializers.EmailField()
     is_admin = serializers.BooleanField()
 
+
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
+
 
 class PasswordResetSerializer(serializers.Serializer):
     token = serializers.CharField()
     new_password = serializers.CharField()
     confirm_password = serializers.CharField()
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError("Passwords do not match.")
+        return data
+
+
+class InviteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Invite
+        fields = '__all__'
+        read_only_fields = ['sender', 'sent_at', 'status']
+
+
+class ContestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contest
+        fields = '__all__'
+
+
+class ContestPerformanceSerializer(serializers.ModelSerializer):
+    contest = ContestSerializer(read_only=True)
+
+    class Meta:
+        model = ContestPerformance
+        fields = ['id', 'contest', 'position', 'upvotes', 'win_date']
+
+
+class BadgeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Badge
+        fields = ['title', 'subtext', 'icon_type', 'image_url']

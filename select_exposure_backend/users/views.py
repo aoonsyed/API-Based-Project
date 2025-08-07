@@ -1,42 +1,46 @@
-from rest_framework.views import APIView
+from datetime import timezone
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework import status, generics, serializers
-from django.contrib.auth.hashers import check_password, make_password
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.tokens import AccessToken
-from .serializers import PasswordResetRequestSerializer, PasswordResetSerializer
 
-from .models import User
+from .models import User, Invite, ContestPerformance, Badge
 from .serializers import (
     UserRegisterSerializer,
     LoginSerializer,
     ContributorRegisterSerializer,
     PasswordResetRequestSerializer,
     PasswordResetSerializer,
+    ToggleAdminSerializer,
+    InviteSerializer,
+    ContestPerformanceSerializer,
+    BadgeSerializer
 )
 
-class ToggleAdminSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    is_admin = serializers.BooleanField()
+User = get_user_model()
 
-class RegisterView(APIView):
-    @swagger_auto_schema(request_body=UserRegisterSerializer)
-    def post(self, request):
+
+class UserViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = User.objects.all()
+    serializer_class = UserRegisterSerializer  # Default serializer, can be overridden per action
+
+    @swagger_auto_schema(method='post', request_body=UserRegisterSerializer)
+    @action(detail=False, methods=['post'], url_path='register')
+    def register(self, request):
         serializer = UserRegisterSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response({"message": "Registration successful."}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class LoginView(APIView):
-    @swagger_auto_schema(request_body=LoginSerializer)
-    def post(self, request):
+    @swagger_auto_schema(method='post', request_body=LoginSerializer)
+    @action(detail=False, methods=['post'], url_path='login')
+    def login(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email'].strip().lower()
@@ -45,6 +49,7 @@ class LoginView(APIView):
             user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             return Response({"detail": "User does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
         if check_password(password, user.password):
             refresh = RefreshToken.for_user(user)
             return Response({
@@ -56,9 +61,9 @@ class LoginView(APIView):
         else:
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
-class ToggleAdminStatusView(APIView):
-    @swagger_auto_schema(request_body=ToggleAdminSerializer)
-    def post(self, request):
+    @swagger_auto_schema(method='post', request_body=ToggleAdminSerializer)
+    @action(detail=False, methods=['post'], url_path='toggle-admin')
+    def toggle_admin(self, request):
         serializer = ToggleAdminSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         email = serializer.validated_data['email']
@@ -67,37 +72,29 @@ class ToggleAdminStatusView(APIView):
             user = User.objects.get(email__iexact=email)
             user.is_admin = is_admin
             user.save()
-            return Response({"message": f"User '{email}' admin status updated to {is_admin}."}, status=status.HTTP_200_OK)
+            return Response({"message": f"User '{email}' admin status updated to {is_admin}."},
+                            status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"detail": "User with this email does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
-class ContributorRegisterView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = ContributorRegisterSerializer
-
-
-
-# Step 1: Request password reset
-class PasswordResetRequestView(APIView):
-    @swagger_auto_schema(request_body=PasswordResetRequestSerializer)
-    def post(self, request):
+    @swagger_auto_schema(method='post', request_body=PasswordResetRequestSerializer)
+    @action(detail=False, methods=['post'], url_path='password-reset-request')
+    def password_reset_request(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
             try:
                 user = User.objects.get(email=email)
-                # Generate token with user_id + 'purpose':'reset'
                 token = AccessToken.for_user(user)
                 token['purpose'] = 'reset'
-                # In real app: send email; here, just return the token
                 return Response({"reset_token": str(token)}, status=200)
             except User.DoesNotExist:
                 return Response({"detail": "User with this email does not exist."}, status=404)
         return Response(serializer.errors, status=400)
 
-class PasswordResetView(APIView):
-    @swagger_auto_schema(request_body=PasswordResetSerializer)
-    def post(self, request):
+    @swagger_auto_schema(method='post', request_body=PasswordResetSerializer)
+    @action(detail=False, methods=['post'], url_path='password-reset')
+    def password_reset(self, request):
         serializer = PasswordResetSerializer(data=request.data)
         if serializer.is_valid():
             token = serializer.validated_data['token']
@@ -114,6 +111,39 @@ class PasswordResetView(APIView):
                 user.password = make_password(new_password)
                 user.save()
                 return Response({"message": "Password reset successful."}, status=200)
-            except Exception as e:
+            except Exception:
                 return Response({"detail": "Invalid or expired token."}, status=400)
         return Response(serializer.errors, status=400)
+
+
+class ContributorViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = User.objects.all()
+    serializer_class = ContributorRegisterSerializer
+
+
+class InviteViewSet(viewsets.ModelViewSet):
+    serializer_class = InviteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Invite.objects.filter(sender=self.request.user).order_by('-sent_at')
+
+    def perform_create(self, serializer):
+        serializer.save(sender=self.request.user, sent_at=timezone.now())
+
+
+class ContestPerformanceViewSet(viewsets.ModelViewSet):
+    serializer_class = ContestPerformanceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ContestPerformance.objects.filter(user=self.request.user).order_by('-win_date')
+
+
+class BadgeViewSet(viewsets.ModelViewSet):
+    serializer_class = BadgeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Badge.objects.filter(user=self.request.user)

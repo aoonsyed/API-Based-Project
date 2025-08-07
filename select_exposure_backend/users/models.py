@@ -89,3 +89,58 @@ class ContributorProfile(models.Model):
                 (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
             )
         return None
+
+
+class Invite(models.Model):
+    INVITE_METHODS = (
+        ('email', 'Email'),
+        ('sms', 'SMS'),
+    )
+
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('joined', 'Joined'),
+        ('failed', 'Failed'),
+    )
+
+    sender = models.ForeignKey(User, on_delete=models.CASCADE)
+    method = models.CharField(max_length=10, choices=INVITE_METHODS)
+    recipient = models.CharField(max_length=255)  # email or phone number
+    message = models.TextField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.sender.email} invited {self.recipient} via {self.method}"
+
+
+class Contest(models.Model):
+    name = models.CharField(max_length=255)
+    gallery = models.CharField(max_length=100)
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    def __str__(self):
+        return f"{self.name} ({self.gallery})"
+
+
+class ContestPerformance(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE)
+    position = models.PositiveIntegerField()
+    upvotes = models.PositiveIntegerField()
+    win_date = models.DateField()
+
+    def __str__(self):
+        return f"{self.user.screen_name} - {self.contest.name} (#{self.position})"
+
+
+class Badge(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=100)
+    subtext = models.CharField(max_length=255)
+    icon_type = models.CharField(max_length=50)  # You can map this to FaTrophy, etc.
+    image_url = models.URLField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.title} - {self.user.email}"

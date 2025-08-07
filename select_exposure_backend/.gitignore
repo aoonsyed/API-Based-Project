@@ -1,0 +1,26 @@
+# Ignore Python virtual environments
+venv/
+.venv/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Django-specific
+db.sqlite3
+*.log
+
+# Environment variables
+.env
+
+# VS Code or JetBrains IDEs
+.vscode/
+.idea/
+
+# Migrations (optional — only if you want to recreate them per-developer)
+*/migrations/
+
+# OS generated files
+.DS_Store
+Thumbs.db
