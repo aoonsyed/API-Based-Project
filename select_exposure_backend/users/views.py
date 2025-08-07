@@ -138,6 +138,8 @@ class ContestPerformanceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return ContestPerformance.objects.none()
         return ContestPerformance.objects.filter(user=self.request.user).order_by('-win_date')
 
 
@@ -146,4 +148,6 @@ class BadgeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return Badge.objects.none()
         return Badge.objects.filter(user=self.request.user)
