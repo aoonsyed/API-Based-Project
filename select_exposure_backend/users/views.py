@@ -27,7 +27,7 @@ User = get_user_model()
 class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = User.objects.all()
-    serializer_class = UserRegisterSerializer  # Default serializer, can be overridden per action
+    serializer_class = UserRegisterSerializer 
 
     @swagger_auto_schema(method='post', request_body=UserRegisterSerializer)
     @action(detail=False, methods=['post'], url_path='register')
@@ -127,6 +127,8 @@ class InviteViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return Invite.objects.none()
         return Invite.objects.filter(sender=self.request.user).order_by('-sent_at')
 
     def perform_create(self, serializer):
