@@ -7,8 +7,10 @@ from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from drf_yasg.utils import swagger_auto_schema
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth import get_user_model
+from rest_framework import filters  # For SearchFilter
+from django_filters.rest_framework import DjangoFilterBackend  # For filtering
 
-from .models import User, Invite, ContestPerformance, Badge
+from .models import User, Invite, ContestPerformance, Badge, Contest, ContestEntry
 from .serializers import (
     UserRegisterSerializer,
     LoginSerializer,
@@ -18,7 +20,7 @@ from .serializers import (
     ToggleAdminSerializer,
     InviteSerializer,
     ContestPerformanceSerializer,
-    BadgeSerializer
+    BadgeSerializer, ContestSerializer, ContestEntrySerializer
 )
 
 User = get_user_model()
@@ -27,7 +29,7 @@ User = get_user_model()
 class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = User.objects.all()
-    serializer_class = UserRegisterSerializer 
+    serializer_class = UserRegisterSerializer
 
     @swagger_auto_schema(method='post', request_body=UserRegisterSerializer)
     @action(detail=False, methods=['post'], url_path='register')
@@ -153,3 +155,39 @@ class BadgeViewSet(viewsets.ModelViewSet):
         if not self.request.user.is_authenticated:
             return Badge.objects.none()
         return Badge.objects.filter(user=self.request.user)
+
+
+class ContestViewSet(viewsets.ModelViewSet):
+    queryset = Contest.objects.all().order_by('-start_date')
+    serializer_class = ContestSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    filterset_fields = ['category']
+    search_fields = ['name', 'description', 'category']
+
+    @action(detail=True, methods=['post'], url_path='join')
+    def join_contest(self, request, pk=None):
+        contest = self.get_object()
+        user = request.user
+
+        if user.role != 'contributor':
+            return Response({"error": "Only contributors can join contests."}, status=status.HTTP_403_FORBIDDEN)
+
+        already_joined = ContestEntry.objects.filter(user=user, contest=contest).exists()
+        if already_joined:
+            return Response({"detail": "Already joined this contest."}, status=status.HTTP_200_OK)
+
+        ContestEntry.objects.create(user=user, contest=contest)
+        return Response({"detail": "Successfully joined."}, status=status.HTTP_201_CREATED)
+
+
+class ContestEntryViewSet(viewsets.ModelViewSet):
+    queryset = ContestEntry.objects.all()
+    serializer_class = ContestEntrySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return ContestEntry.objects.all()
+        return ContestEntry.objects.filter(user=user)

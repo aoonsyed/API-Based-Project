@@ -1,5 +1,5 @@
 # Ignore Python virtual environments
-venv/
+API-Based-Project/venv/
 .venv/
 
 # Byte-compiled / cache

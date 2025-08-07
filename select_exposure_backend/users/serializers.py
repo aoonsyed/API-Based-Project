@@ -1,13 +1,13 @@
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-
+from django.utils import timezone
 from .models import (
     User,
     ContributorProfile,
     Contest,
     ContestPerformance,
     Badge,
-    Invite,
+    Invite, ContestEntry,
 )
 
 
@@ -114,9 +114,24 @@ class InviteSerializer(serializers.ModelSerializer):
 
 
 class ContestSerializer(serializers.ModelSerializer):
+    is_active = serializers.SerializerMethodField()
+    is_upcoming = serializers.SerializerMethodField()
+    joined_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Contest
         fields = '__all__'
+
+    def get_is_active(self, obj):
+        now = timezone.now()
+        return obj.start_date <= now <= obj.end_date
+
+    def get_is_upcoming(self, obj):
+        return obj.start_date > timezone.now()
+
+    def get_joined_count(self, obj):
+        from .models import ContestEntry
+        return ContestEntry.objects.filter(contest=obj).count()
 
 
 class ContestPerformanceSerializer(serializers.ModelSerializer):
@@ -131,3 +146,9 @@ class BadgeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Badge
         fields = ['title', 'subtext', 'icon_type', 'image_url']
+
+
+class ContestEntrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContestEntry
+        fields = '__all__'

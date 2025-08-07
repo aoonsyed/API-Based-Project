@@ -1,3 +1,5 @@
+from django.utils import timezone
+
 from django.db import models
 
 ROLES = (
@@ -45,9 +47,10 @@ BODY_TYPES_FEMALE = (
     ('plus_size', 'Plus Size'),
 )
 
+
 class User(models.Model):
     email = models.EmailField(unique=True)
-    password = models.CharField(max_length=128)   # store hashed password
+    password = models.CharField(max_length=128)  # store hashed password
     screen_name = models.CharField(max_length=150)
     role = models.CharField(choices=ROLES, max_length=20, default='user')
     card_details = models.CharField(max_length=255, blank=True, null=True)
@@ -57,6 +60,7 @@ class User(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.role}"
+
 
 class ContributorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='contributor_profile')
@@ -86,7 +90,7 @@ class ContributorProfile(models.Model):
         if self.date_of_birth:
             today = date.today()
             return today.year - self.date_of_birth.year - (
-                (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
+                    (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
             )
         return None
 
@@ -115,13 +119,47 @@ class Invite(models.Model):
 
 
 class Contest(models.Model):
+    CATEGORY_CHOICES = (
+        ('Hand', 'Hand'),
+        ('Face', 'Face'),
+        ('Legs', 'Legs'),
+        ('Feet', 'Feet'),
+        ('Teaser', 'Teaser'),
+        ('Full Body', 'Full Body'),
+    )
+
     name = models.CharField(max_length=255)
     gallery = models.CharField(max_length=100)
-    start_date = models.DateField()
-    end_date = models.DateField()
+    description = models.TextField(blank=True)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='Full Body')
+    image_url = models.URLField(blank=True, null=True)
+    estimated_prize = models.CharField(max_length=50, blank=True)
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
 
     def __str__(self):
-        return f"{self.name} ({self.gallery})"
+        return f"{self.name} ({self.category})"
+
+    @property
+    def is_active(self):
+        now = timezone.now()
+        return self.start_date <= now <= self.end_date
+
+    @property
+    def is_upcoming(self):
+        return self.start_date > timezone.now()
+
+
+class ContestEntry(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'contest')
+
+    def __str__(self):
+        return f"{self.user.email} joined {self.contest.name}"
 
 
 class ContestPerformance(models.Model):
